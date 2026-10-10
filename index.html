@@ -302,12 +302,28 @@ function sharedCards(list){
   if(!keys.length) return '';
   return keys.map(function(k){
     var g=list.filter(function(it){return it.techset.join(' + ')===k;}), names=g[0].techset;
-    var table=g.map(function(it){return [it.wo].concat(names).join('\t');}).join('\r\n');
+    var mon=getMonday();
+    var d=function(i){return i!==null&&mon?fdate(addDays(mon,i)):'';};
+    var ops=function(onlyAdded){
+      var rows=[];
+      g.forEach(function(it){
+        // the owner's operation exists already; the others need an operation added
+        names.forEach(function(n){
+          if(onlyAdded&&n===it.tech) return;
+          var h=techHours(it,n), days=it.entries.filter(function(e){return e.block.name===n&&e.day!==null;}).map(function(e){return e.day;});
+          var st=days.length?Math.min.apply(null,days):null, fi=days.length?Math.max.apply(null,days):null;
+          rows.push([it.wo,n,h===null?'':fh(h),d(st),d(fi)].join('\t'));
+        });
+      });
+      return rows.join('\r\n');
+    };
+    var added=ops(true).split('\r\n').length;
     return '<article class="card"><header><h2>'+esc(k)+'</h2><span class="badge">'+g.length+' shared WO</span></header>'+
       '<ul class="wolist">'+g.map(function(it){
-        return '<li>'+esc(it.wo)+'<small>'+names.map(function(n){var h=techHours(it,n);return esc(n)+(h!==null?' '+fh(h)+'h':'');}).join(' · ')+(it.start!==null?' · '+dspan(it):'')+'</small></li>';}).join('')+'</ul>'+
+        return '<li>'+esc(it.wo)+'<small>'+names.map(function(n){var h=techHours(it,n);return esc(n)+(n===it.tech?' (op 1)':' (add op)')+(h!==null?' '+fh(h)+'h':'');}).join(' · ')+'</small></li>';}).join('')+'</ul>'+
       '<footer>'+copyBtn(g.map(function(it){return it.wo;}).join('\r\n'),'Copy shared WOs',g.length+' shared WOs ('+k+')','pri')+
-      ' '+copyBtn(table,'Copy WO + technicians','table of '+g.length+' shared WOs')+'</footer></article>';
+      ' '+copyBtn(ops(true),'Copy operations to add ('+added+')','operations to add (WO · technician · hours · start · finish)')+
+      ' '+copyBtn(ops(false),'Copy all operations','all operations (WO · technician · hours · start · finish)')+'</footer></article>';
   }).join('');
 }
 function workCenterCards(techs,allItems){
