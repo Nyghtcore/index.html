@@ -336,6 +336,18 @@ function workCenterCards(techs,allItems){
       '<footer>'+(own.length?copyBtn(own.map(function(it){return it.wo;}).join('\r\n'),'Copy WOs',own.length+' WOs for '+x.name,'pri'):'<button type="button" disabled>No solo WOs</button>')+'</footer></article>';
   }).join('')+sharedCards(shared);
 }
+function confirmCard(items,mon){
+  var sorted=items.slice().sort(function(a,b){return a.wo<b.wo?-1:a.wo>b.wo?1:0;});
+  var d=function(i){return i!==null&&mon?fdate(addDays(mon,i)):'';};
+  var table=sorted.map(function(it){return [it.wo,it.tech,it.hours===null?'':fh(it.hours),d(it.start),d(it.finish)].join('\t');}).join('\r\n');
+  var total=items.reduce(function(s,r){return s+(r.hours||0);},0);
+  var nodur=items.filter(function(r){return r.hours===null;}).length, noday=items.filter(function(r){return r.start===null;}).length;
+  return '<div class="cards"><article class="card"><header><h2>ALL WORK ORDERS</h2><span class="badge">'+items.length+' WO</span><span class="badge h">'+fh(total)+' h</span></header>'+
+    '<ul class="wolist"><li>Paste into Multiple Selection and check the count matches '+items.length+'.</li>'+
+    (nodur?'<li>'+nodur+' without hours</li>':'')+(noday?'<li>'+noday+' without a day (no date set)</li>':'')+'</ul>'+
+    '<footer>'+copyBtn(sorted.map(function(it){return it.wo;}).join('\r\n'),'Copy all '+items.length+' WOs',items.length+' WOs, whole plan','pri')+
+    ' '+copyBtn(table,'Copy plan table (WO · tech · hours · start · finish)','plan table, '+items.length+' rows')+'</footer></article></div>';
+}
 function durCards(items,showTech){
   var keys=uniq(items.filter(function(r){return r.hours!==null;}).map(function(r){return r.hours;})).sort(function(a,b){return b-a;});
   if(items.some(function(r){return r.hours===null;})) keys.push(null);
@@ -423,7 +435,8 @@ function render(){
     '<div class="step">1 · Work center — one pass per technician, then the shared WOs</div>'+
     '<div class="cards">'+workCenterCards(techs,items)+'</div>'+
     '<div class="step">2 · Duration — everyone together</div>'+durCards(items,false)+
-    '<div class="step">3 · Day &amp; date — everyone together</div>'+dayBlocks(items,mon,false);
+    '<div class="step">3 · Day &amp; date — everyone together</div>'+dayBlocks(items,mon,false)+
+    '<div class="step">4 · Confirm the plan — every work order together</div>'+confirmCard(items,mon);
   $('paneDur').innerHTML=durCards(items,true);
   $('paneDay').innerHTML=dayBlocks(items,mon,true);
 }
