@@ -49,6 +49,7 @@ button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid var(--line
 button:hover{border-color:var(--accent)}
 button.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 button.pri:hover{filter:brightness(1.08)}
+button.done{opacity:.55}
 button:disabled{opacity:.45;cursor:not-allowed}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
@@ -146,11 +147,13 @@ td.t{white-space:normal;min-width:220px}
   <div id="notices"></div>
 
   <div class="tabs" role="tablist">
-    <button role="tab" id="tabTech" aria-controls="paneTech" aria-selected="true" type="button">By Technician</button>
+    <button role="tab" id="tabFast" aria-controls="paneFast" aria-selected="true" type="button">Quick: Everyone</button>
+    <button role="tab" id="tabTech" aria-controls="paneTech" aria-selected="false" type="button">By Technician</button>
     <button role="tab" id="tabDur" aria-controls="paneDur" aria-selected="false" type="button">All: Duration</button>
     <button role="tab" id="tabDay" aria-controls="paneDay" aria-selected="false" type="button">All: Day &amp; SAP Date</button>
   </div>
-  <div id="paneTech" role="tabpanel" aria-labelledby="tabTech"></div>
+  <div id="paneFast" role="tabpanel" aria-labelledby="tabFast"></div>
+  <div id="paneTech" role="tabpanel" aria-labelledby="tabTech" hidden></div>
   <div id="paneDur" role="tabpanel" aria-labelledby="tabDur" hidden></div>
   <div id="paneDay" role="tabpanel" aria-labelledby="tabDay" hidden></div>
 </div>
@@ -357,7 +360,7 @@ function render(){
   $('notices').innerHTML=n; $('notices').hidden=!n;
 
   var empty='<div class="empty">No work orders found yet. Paste the plan from Excel above, with each technician\'s Tarea / WO / Horas / Notas block.</div>';
-  if(!items.length){ $('paneTech').innerHTML=empty; $('paneDur').innerHTML=empty; $('paneDay').innerHTML=empty; return; }
+  if(!items.length){ $('paneFast').innerHTML=empty; $('paneTech').innerHTML=empty; $('paneDur').innerHTML=empty; $('paneDay').innerHTML=empty; return; }
 
   if(!techs.some(function(t){return t.name===selTech;})) selTech=techs[0].name;
   var t=techs.filter(function(x){return x.name===selTech;})[0];
@@ -371,6 +374,14 @@ function render(){
     '<div class="step">2 · Duration</div>'+durCards(t.items,false)+
     '<div class="step">3 · Day &amp; date</div>'+dayBlocks(t.items,mon,false);
   $('paneTech').dataset.techs=JSON.stringify(techs.map(function(x){return x.name;}));
+  $('paneFast').innerHTML=
+    '<div class="step">1 · Work center — one pass per technician</div>'+
+    '<div class="cards">'+techs.map(function(x){
+      var h=x.items.reduce(function(s,r){return s+(r.hours||0);},0);
+      return '<article class="card"><header><h2>'+esc(x.name)+'</h2><span class="badge">'+x.items.length+' WO</span><span class="badge h">'+fh(h)+' h</span></header>'+
+        '<footer>'+copyBtn(x.items.map(function(it){return it.wo;}).join('\r\n'),'Copy WOs',x.items.length+' WOs for '+x.name,'pri')+'</footer></article>';}).join('')+'</div>'+
+    '<div class="step">2 · Duration — everyone together</div>'+durCards(items,false)+
+    '<div class="step">3 · Day &amp; date — everyone together</div>'+dayBlocks(items,mon,false);
   $('paneDur').innerHTML=durCards(items,true);
   $('paneDay').innerHTML=dayBlocks(items,mon,true);
 }
@@ -384,13 +395,13 @@ function fallbackCopy(text){
 document.addEventListener('click',function(e){
   var b=e.target.closest('[data-copy]'); if(!b) return;
   var item=copyStore[+b.getAttribute('data-copy')]; if(!item) return;
-  var done=function(ok){toast(ok?'Copied '+item.what:'Copy was blocked by the browser. Select the rows and press Ctrl+C.');};
+  var done=function(ok){if(ok){b.classList.add('done');if(b.textContent.indexOf('✓')<0)b.textContent='✓ '+b.textContent;}toast(ok?'Copied '+item.what:'Copy was blocked by the browser. Select the rows and press Ctrl+C.');};
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(item.text).then(function(){done(true);},function(){done(fallbackCopy(item.text));});
   } else done(fallbackCopy(item.text));
 });
 
-var TABS=['Tech','Dur','Day'];
+var TABS=['Fast','Tech','Dur','Day'];
 function setTab(name){
   TABS.forEach(function(k){
     $('tab'+k).setAttribute('aria-selected',String(k===name)); $('pane'+k).hidden=(k!==name);
