@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAP PM Week Planner</title>
+<style>
+/* Layout: dark title bar, then one working column: paste + controls, four metrics, two tabs of copy-ready groups. */
+:root{
+  --bg:#edf0f3; --surface:#ffffff; --sunken:#f5f7f9; --ink:#15212b; --muted:#586876; --line:#d3dae1;
+  --head:#13202b; --head-ink:#eef3f7; --head-muted:#9fb0bd;
+  --accent:#0b6b94; --accent-ink:#ffffff; --accent-soft:#e1eff5;
+  --hl:#ffe640; --hl-ink:#221d00; --warn:#9a5b00; --warn-bg:#fff4d9; --ok:#1c7a4d;
+  --sans:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d151b; --surface:#16222c; --sunken:#111b23; --ink:#e5ecf1; --muted:#93a4b2; --line:#293946;
+  --head:#080f14; --head-ink:#eef3f7; --head-muted:#8fa1af;
+  --accent:#55b8dd; --accent-ink:#04212e; --accent-soft:#17323f;
+  --hl:#f0d83a; --hl-ink:#221d00; --warn:#f2c260; --warn-bg:#33290f; --ok:#4cc38a; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0d151b; --surface:#16222c; --sunken:#111b23; --ink:#e5ecf1; --muted:#93a4b2; --line:#293946;
+  --head:#080f14; --head-ink:#eef3f7; --head-muted:#8fa1af;
+  --accent:#55b8dd; --accent-ink:#04212e; --accent-soft:#17323f;
+  --hl:#f0d83a; --hl-ink:#221d00; --warn:#f2c260; --warn-bg:#33290f; --ok:#4cc38a; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans)}
+.top{background:var(--head);color:var(--head-ink)}
+.top-in,.wrap{max-width:1180px;margin:0 auto;padding-inline:20px}
+.top-in{padding-block:18px;display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline}
+.top h1{margin:0;font-size:20px;font-weight:650;letter-spacing:.01em}
+.top p{margin:0;color:var(--head-muted);font-size:13px}
+.wrap{padding-block:20px 60px;display:flex;flex-direction:column;gap:18px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;
+  display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:18px}
+@media (max-width:760px){.panel{grid-template-columns:minmax(0,1fr)}}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field>label,.lbl{font-size:11px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+textarea,select,input[type=date]{font:inherit;color:var(--ink);background:var(--sunken);border:1px solid var(--line);border-radius:7px;padding:8px 10px;width:100%}
+textarea{font:12.5px/1.5 var(--mono);min-height:210px;resize:vertical;white-space:pre;overflow:auto;tab-size:4}
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;font-weight:600;font-size:13px}
+button:hover{border-color:var(--accent)}
+button.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.pri:hover{filter:brightness(1.08)}
+button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:620px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.metric{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.metric b{display:block;font-size:26px;font-weight:650;line-height:1.15;font-variant-numeric:tabular-nums}
+
+.notice{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:10px 14px;font-size:13px}
+.notice summary{cursor:pointer;font-weight:600}
+.notice ul{margin:8px 0 0;padding-left:18px}
+
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);flex-wrap:wrap}
+.tabs button{border:0;border-radius:7px 7px 0 0;background:transparent;color:var(--muted);padding:10px 16px;margin-bottom:-2px;border-bottom:2px solid transparent;font-size:14px}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent);background:var(--surface)}
+
+.badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:650;background:var(--accent-soft);color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
+.badge.h{background:var(--hl);color:var(--hl-ink)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;align-items:start}
+.card,.day{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.card header,.day header{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+.card h2,.day h2{margin:0;font-size:16px;font-weight:650;letter-spacing:.02em;margin-right:auto}
+.day h2 span{font-family:var(--mono);font-weight:500;color:var(--muted)}
+.wolist{list-style:none;margin:0;padding:10px 14px;font:13px/1.7 var(--mono);font-variant-numeric:tabular-nums;max-height:300px;overflow:auto}
+.wolist small{font-family:var(--sans);color:var(--muted);margin-left:8px}
+.card footer{padding:10px 14px;border-top:1px solid var(--line)}
+.card footer button{width:100%}
+.days{display:flex;flex-direction:column;gap:14px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:7px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:650;background:var(--sunken)}
+tr:last-child td{border-bottom:0}
+td.m,td.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+td.n,th.n{text-align:right}
+td.t{white-space:normal;min-width:220px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.chips button{display:flex;gap:8px;align-items:center;padding:8px 14px}
+.chips button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chips .badge{background:rgba(127,127,127,.2);color:inherit}
+.step{font-size:11px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.step:first-child{margin-top:0}
+.wolist small.t{color:var(--accent);font-weight:600}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:28px;text-align:center;color:var(--muted)}
+
+#toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--head);color:var(--head-ink);
+  border-left:4px solid var(--ok);padding:10px 16px;border-radius:8px;font-weight:600;font-size:13px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;max-width:calc(100vw - 32px);box-shadow:0 6px 24px rgba(0,0,0,.3)}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <h1>SAP PM Week Planner</h1>
+  <p>Paste the weekly plan from Excel. Copy work orders by duration or by day, ready for Multiple Selection (Shift+F12).</p>
+</div></div>
+
+<div class="wrap">
+  <section class="panel">
+    <div class="field">
+      <label for="src">Excel data (paste the whole plan: every technician block, Tarea · WO · Horas · Notas)</label>
+      <textarea id="src" spellcheck="false" placeholder="Paste rows copied from Excel here"></textarea>
+      <div class="row">
+        <button id="btnSample" type="button">Load sample</button>
+        <button id="btnClear" type="button">Clear</button>
+        <span class="hint">Subtotal rows, headers and rows without a WO are left out.</span>
+      </div>
+    </div>
+    <div class="side">
+      <div class="field">
+        <label for="week">Week starting (Monday)</label>
+        <input type="date" id="week">
+        <p class="hint" id="weekNote"></p>
+      </div>
+      <div class="field">
+        <label for="fmt">SAP date format</label>
+        <select id="fmt">
+          <option>DD.MM.YYYY</option><option>YYYY-MM-DD</option><option>MM/DD/YYYY</option>
+          <option>DD/MM/YYYY</option><option>MM.DD.YYYY</option><option>YYYYMMDD</option>
+        </select>
+      </div>
+      <p class="hint">Technician names are read from above each Tarea header, side-by-side blocks included. A day name applies to its row and every row below it until the next day name.</p>
+    </div>
+  </section>
+
+  <section class="metrics" aria-label="Summary">
+    <div class="metric"><span class="lbl">Work orders</span><b id="mWo">0</b></div>
+    <div class="metric"><span class="lbl">Scheduled hours</span><b id="mHr">0</b></div>
+    <div class="metric"><span class="lbl">Active days</span><b id="mDay">0</b></div>
+    <div class="metric"><span class="lbl">Technicians</span><b id="mGrp">0</b></div>
+  </section>
+
+  <div id="notices"></div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabTech" aria-controls="paneTech" aria-selected="true" type="button">By Technician</button>
+    <button role="tab" id="tabDur" aria-controls="paneDur" aria-selected="false" type="button">All: Duration</button>
+    <button role="tab" id="tabDay" aria-controls="paneDay" aria-selected="false" type="button">All: Day &amp; SAP Date</button>
+  </div>
+  <div id="paneTech" role="tabpanel" aria-labelledby="tabTech"></div>
+  <div id="paneDur" role="tabpanel" aria-labelledby="tabDur" hidden></div>
+  <div id="paneDay" role="tabpanel" aria-labelledby="tabDay" hidden></div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/*PARSE-START*/
+var DAY_NAMES = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO'];
+var DAYS = new Map();
+[['lunes','monday','mon','lun'],['martes','tuesday','tue','tues','mar'],['miercoles','wednesday','wed','mie'],
+ ['jueves','thursday','thu','thur','thurs','jue'],['viernes','friday','fri','vie'],
+ ['sabado','saturday','sat','sab'],['domingo','sunday','sun','dom']]
+  .forEach(function(a,i){a.forEach(function(n){DAYS.set(n,i);});});
+var WO_RE  = /^\d{6,12}$/;
+var NUM_RE = /^\d{1,3}(?:[.,]\d{1,2})?\s*(?:h|hr|hrs|hours?|horas?)?$/i;
+function norm(s){return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z]/g,'');}
+function dayOf(s){return (s && !/\d/.test(s) && DAYS.has(norm(s))) ? DAYS.get(norm(s)) : null;}
+function num(s){return parseFloat(s.replace(',','.'));}
+
+// The technician name sits within a column of the "Tarea" header, in one of the 3 rows above it.
+function findName(lines,i,k){
+  for(var j=i-1;j>=0&&j>=i-3;j--){
+    for(var c=k-1;c<=k+1;c++){
+      var v=lines[j][c]; if(!v) continue;
+      if(/\d/.test(v)||/^libre$/i.test(v)||dayOf(v)!==null) return null;
+      return v;
+    }
+  }
+  return null;
+}
+
+// Reads the pasted grid. Every "Tarea" cell starts a block of 4 columns (Tarea, WO, Horas, Notas)
+// that runs down until the next "Tarea" in the same column, so side-by-side technicians all parse.
+function parse(text){
+  var lines=text.split(/\r?\n/).map(function(l){return l.split('\t').map(function(c){return c.trim().replace(/^"|"$/g,'');});});
+  var blocks=[], active={}, entries=[], skipped=[];
+  lines.forEach(function(cells,i){
+    var started={};
+    cells.forEach(function(c,k){
+      if(!/^tarea$/i.test(c)) return;
+      var b={col:k,day:null,order:blocks.length,name:findName(lines,i,k)||('Technician '+(blocks.length+1))};
+      blocks.push(b); active[k]=b; started[k]=true;
+    });
+    Object.keys(active).forEach(function(key){
+      if(started[key]) return;
+      var k=+key, b=active[k];
+      var desc=cells[k]||'', wo=(cells[k+1]||'').replace(/\s/g,''), hv=cells[k+2]||'', note=cells[k+3]||'';
+      var d=dayOf(note); if(d!==null) b.day=d;
+      var hours=NUM_RE.test(hv)?num(hv):null;
+      if(WO_RE.test(wo)) entries.push({wo:wo,hours:hours,desc:desc,day:b.day,block:b,line:i+1});
+      else if(desc && hours!==null && dayOf(desc)===null) skipped.push({desc:desc,hours:hours,tech:b.name,line:i+1});
+    });
+  });
+  return {entries:entries,skipped:skipped,blocks:blocks};
+}
+
+// One item per work order. The first technician block that lists it owns it (work center and hours);
+// the span of days it is listed on becomes start..finish.
+function build(entries){
+  var map=new Map(), items=[];
+  entries.forEach(function(e){
+    var it=map.get(e.wo);
+    if(!it){ it={wo:e.wo,desc:e.desc,tech:e.block.name,order:e.block.order,hours:null,days:[],others:[],entries:[]}; map.set(e.wo,it); items.push(it); }
+    it.entries.push(e);
+  });
+  items.forEach(function(it){
+    var best=Math.min.apply(null,it.entries.map(function(e){return e.block.order;}));
+    var own=it.entries.filter(function(e){return e.block.order===best;});
+    it.tech=own[0].block.name; it.desc=own[0].desc;
+    var hs=own.filter(function(e){return e.hours!==null;});
+    it.hours=hs.length?hs.reduce(function(s,e){return s+e.hours;},0):null;
+    it.days=it.entries.map(function(e){return e.day;}).filter(function(d){return d!==null;});
+    it.start=it.days.length?Math.min.apply(null,it.days):null;
+    it.finish=it.days.length?Math.max.apply(null,it.days):null;
+    it.others=it.entries.filter(function(e){return e.block.name!==it.tech;}).map(function(e){return e.block.name;});
+    it.others=it.others.filter(function(v,i,a){return a.indexOf(v)===i;});
+    it.multi=it.entries.length>1;
+  });
+  return items;
+}
+var SAMPLE = [
+['William'],['Tarea','WO','Horas','Notas'],
+['Verificacion de Area Asignada','','2','Semana'],['LIBRE','','','Lunes'],
+['DOORS INSPECTION EXT BLDG 3, 4MTH ADM','941008023','4.5','Martes'],['DOOR INSPECTION 621C, 6MTH GMP','941007924','1.5',''],
+['STEAM TABLE INSPECTION, 6MTH ADM','941008134','1',''],['','','7',''],
+['DOORS INSPECTION EXT BLDG 90, 4MTH ADM','941008025','3','Miercoles'],['DOORS INSPECTION BLDG 90, 1MTH GMP/SAF','941007977','1.5',''],
+['DOOR INSPECTION 634B, 6MTH GMP','941007925','1.5',''],['BLDG 23 Acumulación de agua en el piso','910606917','1',''],['','','7',''],
+['AC-RM733 AIR CURTAIN, 6 MTH GMP','941008284','1.5','Jueves'],['AC-RM748 AIR CURTAIN, 6 MTH GMP','941008282','1.5',''],
+['AC-RM750 AIR CURTAIN, 6 MTH GMP','941008283','1.5',''],['AC-RM54-03 AIR CURTAIN, 6MTH ADM','941007921','1.5',''],
+['Falta acustico en techo frente a baños - Nexgard Lab','910599398','1',''],['','','7',''],
+['CONFINED SPACES SIGNS ROUTE 4, 6MTH SAF','941008261','7','Viernes'],['','','7',''],
+['Reemplazar acústicos dañados Lab.','910603876','3','Sabado'],['Items de almacen - Pintura y demas (Yelitza email)','','4',''],['','','7',''],
+[''],['Miguel Lopez Kako'],['Tarea','WO','Horas','Notas'],
+['FORK LIFT 10, 6MTH SAF','941007895','2.5','Lunes'],['CLUB CAR TEMPO #1, 4MTH ADM','941008262','2',''],
+['CAPITAL WORKSHOP INSPECTION, 1MTH ADM','941008165','1.5',''],['WRP-01 PALLET WRAPPER, 6 MTH ADM','941008226','1',''],['','','7',''],
+['CLUB CAR CARRYALL 300 #4, 4MTH ADM','941008265','3','Martes'],['CLUB CAR TEMPO #2, 4MTH ADM','941008263','2',''],
+['CLUB CAR TEMPO #3, 4MTH ADM','941008264','2',''],['','','7',''],
+['FORK LIFT 39, 6MTH SAF','941007891','2.5','Miercoles'],['FORK LIFT 43, 6MTH SAF','941007892','2.5',''],
+['Verificar Montacargas 59','910600045','2',''],['','','7',''],
+['FORK LIFT 53, 6MTH SAF','941008153','2.5','Jueves'],['H-27180 HAZMAT, 1MTH ADM','941007893','2.5',''],
+['CLUB CAR CARRYALL 300 #5, 4MTH ADM','941008266','2',''],['','','7',''],
+['MAIN ENTRANCE GATE, 3MTH ADM','941007999','4','Viernes'],['Reparar conexiones de la bateria','910609321','2',''],
+['DOCK LEVELER ROOM 54, 6MTH SAF','941007864','1',''],['','','7',''],['LIBRE','','','Sabado']
+].map(function(r){return r.join('\t');}).join('\n');
+/*PARSE-END*/
+
+var $=function(id){return document.getElementById(id);};
+var ta=$('src'), week=$('week'), fmt=$('fmt');
+var copyStore=[];
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fh(n){return String(Math.round(n*100)/100);}
+function store(get,key){try{return get?localStorage.getItem(key):null;}catch(e){return null;}}
+function save(key,val){try{localStorage.setItem(key,val);}catch(e){}}
+function p2(n){return (n<10?'0':'')+n;}
+function iso(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+function fdate(d){return fmt.value.replace('DD',p2(d.getDate())).replace('MM',p2(d.getMonth()+1)).replace('YYYY',d.getFullYear());}
+function mondayOf(d){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()-((x.getDay()+6)%7)); return x;}
+function getMonday(){
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(week.value); if(!m) return null;
+  return new Date(+m[1],+m[2]-1,+m[3]);
+}
+function addDays(d,n){return new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);}
+function uniq(a){return a.filter(function(v,i){return a.indexOf(v)===i;});}
+function copyBtn(text,label,what,cls){
+  copyStore.push({text:text,what:what});
+  return '<button type="button" class="'+(cls||'')+'" data-copy="'+(copyStore.length-1)+'">'+label+'</button>';
+}
+
+var selTech=null;
+function dspan(it){
+  if(it.start===null) return '';
+  var a=DAY_NAMES[it.start].slice(0,3);
+  return it.finish!==it.start ? a+'→'+DAY_NAMES[it.finish].slice(0,3) : a;
+}
+function tag(it,showTech){return (showTech?'<small class="t">'+esc(it.tech)+'</small>':'')+(dspan(it)?'<small>'+dspan(it)+'</small>':'');}
+
+function durCards(items,showTech){
+  var keys=uniq(items.filter(function(r){return r.hours!==null;}).map(function(r){return r.hours;})).sort(function(a,b){return b-a;});
+  if(items.some(function(r){return r.hours===null;})) keys.push(null);
+  return '<div class="cards">'+keys.map(function(h){
+    var g=items.filter(function(r){return r.hours===h;});
+    var label=h===null?'NO DURATION':fh(h)+(h===1?' HOUR':' HOURS');
+    return '<article class="card"><header><h2>'+label+'</h2><span class="badge">'+g.length+' WO</span></header>'+
+      '<ul class="wolist">'+g.map(function(it){return '<li>'+esc(it.wo)+tag(it,showTech)+'</li>';}).join('')+'</ul>'+
+      '<footer>'+copyBtn(g.map(function(it){return it.wo;}).join('\r\n'),'Copy WOs',g.length+' WOs ('+label.toLowerCase()+')','pri')+'</footer></article>';
+  }).join('')+'</div>';
+}
+
+function dayBlocks(items,mon,showTech){
+  var dk=uniq(items.filter(function(r){return r.start!==null;}).map(function(r){return r.start;})).sort();
+  if(items.some(function(r){return r.start===null;})) dk.push(null);
+  var all=[];
+  var html=dk.map(function(d){
+    var g=items.filter(function(r){return r.start===d;});
+    var list=g.map(function(r){return r.wo;});
+    var date=(d!==null&&mon)?fdate(addDays(mon,d)):'';
+    var hrs=g.reduce(function(s,r){return s+(r.hours||0);},0);
+    var fin=function(r){return mon&&r.finish!==null?fdate(addDays(mon,r.finish)):date;};
+    var table=g.map(function(r){return r.wo+'\t'+date+'\t'+fin(r);});
+    if(date) all=all.concat(table);
+    var name=d===null?'NO DAY ASSIGNED':DAY_NAMES[d];
+    return '<section class="day"><header><h2>'+name+(date?' <span>— '+date+'</span>':'')+'</h2>'+
+      '<span class="badge">'+list.length+' WO</span><span class="badge h">'+fh(hrs)+' h</span>'+
+      copyBtn(list.join('\r\n'),'Copy WOs',list.length+' WOs for '+name.toLowerCase())+
+      (date?copyBtn(table.join('\r\n'),'Copy Table (WO + Start/Finish Date)','table for '+name.toLowerCase()+' ('+date+')','pri'):
+            '<button type="button" disabled>Copy Table (needs a day and week)</button>')+
+      '</header><div class="scroll"><table><thead><tr><th>WO</th>'+(showTech?'<th>Tech</th>':'')+'<th>Task</th><th class="n">Hours</th><th>Start</th><th>Finish</th></tr></thead><tbody>'+
+      g.map(function(r){return '<tr><td class="m">'+esc(r.wo)+'</td>'+(showTech?'<td>'+esc(r.tech)+'</td>':'')+'<td class="t">'+esc(r.desc)+'</td><td class="n">'+(r.hours===null?'':fh(r.hours))+
+        '</td><td class="m">'+date+'</td><td class="m">'+fin(r)+'</td></tr>';}).join('')+
+      '</tbody></table></div></section>';
+  }).join('');
+  return '<div class="days"><div class="bar"><span class="hint">Start and finish are the same date unless a work order is planned on several days.</span>'+
+    (all.length?copyBtn(all.join('\r\n'),'Copy whole week (WO + Start/Finish Date)','whole week, '+all.length+' rows'):'')+'</div>'+html+'</div>';
+}
+
+function render(){
+  var res=parse(ta.value), items=build(res.entries), mon=getMonday();
+  copyStore.length=0;
+  var techs=[]; items.slice().sort(function(a,b){return a.order-b.order;}).forEach(function(it){
+    var t=techs.filter(function(x){return x.name===it.tech;})[0];
+    if(!t){t={name:it.tech,items:[]}; techs.push(t);}
+    t.items.push(it);
+  });
+  var total=items.reduce(function(s,r){return s+(r.hours||0);},0);
+  var dayKeys=uniq(res.entries.filter(function(r){return r.day!==null;}).map(function(r){return r.day;}));
+  $('mWo').textContent=items.length; $('mHr').textContent=fh(total);
+  $('mDay').textContent=dayKeys.length; $('mGrp').textContent=techs.length;
+
+  if(mon){ $('weekNote').textContent='Week '+fdate(mon)+' to '+fdate(addDays(mon,6)); }
+  else $('weekNote').textContent='Pick a date to calculate the SAP dates.';
+
+  var n='';
+  var shared=items.filter(function(it){return it.multi;});
+  if(shared.length) n+='<details class="notice"><summary>'+shared.length+' work order'+(shared.length>1?'s are':' is')+' listed more than once</summary><ul>'+
+    shared.map(function(it){
+      return '<li>'+esc(it.wo)+' · owned by '+esc(it.tech)+', '+fh(it.hours||0)+' h'+(it.start!==null?', '+dspan(it):'')+
+        (it.others.length?' · also listed under '+it.others.map(esc).join(', ')+' (their hours are not counted)':'')+'</li>';}).join('')+
+    '</ul></details>';
+  if(res.skipped.length){
+    n+='<details class="notice"><summary>'+res.skipped.length+' row'+(res.skipped.length>1?'s':'')+' with hours but no work order ('+
+      fh(res.skipped.reduce(function(s,r){return s+r.hours;},0))+' h, not counted)</summary><ul>'+
+      res.skipped.map(function(r){return '<li>'+esc(r.tech)+' · '+esc(r.desc)+' · '+fh(r.hours)+' h</li>';}).join('')+'</ul></details>';
+  }
+  $('notices').innerHTML=n; $('notices').hidden=!n;
+
+  var empty='<div class="empty">No work orders found yet. Paste the plan from Excel above, with each technician\'s Tarea / WO / Horas / Notas block.</div>';
+  if(!items.length){ $('paneTech').innerHTML=empty; $('paneDur').innerHTML=empty; $('paneDay').innerHTML=empty; return; }
+
+  if(!techs.some(function(t){return t.name===selTech;})) selTech=techs[0].name;
+  var t=techs.filter(function(x){return x.name===selTech;})[0];
+  var hrs=t.items.reduce(function(s,r){return s+(r.hours||0);},0);
+  $('paneTech').innerHTML=
+    '<div class="chips">'+techs.map(function(x,i){
+      return '<button type="button" data-tech="'+i+'" aria-pressed="'+(x.name===selTech)+'">'+esc(x.name)+' <span class="badge">'+x.items.length+'</span></button>';}).join('')+'</div>'+
+    '<div class="step">1 · Work center — all of '+esc(t.name)+'\'s orders</div>'+
+    '<div class="cards"><article class="card"><header><h2>'+esc(t.name)+'</h2><span class="badge">'+t.items.length+' WO</span><span class="badge h">'+fh(hrs)+' h</span></header>'+
+    '<footer>'+copyBtn(t.items.map(function(it){return it.wo;}).join('\r\n'),'Copy all WOs',t.items.length+' WOs for '+t.name,'pri')+'</footer></article></div>'+
+    '<div class="step">2 · Duration</div>'+durCards(t.items,false)+
+    '<div class="step">3 · Day &amp; date</div>'+dayBlocks(t.items,mon,false);
+  $('paneTech').dataset.techs=JSON.stringify(techs.map(function(x){return x.name;}));
+  $('paneDur').innerHTML=durCards(items,true);
+  $('paneDay').innerHTML=dayBlocks(items,mon,true);
+}
+
+var toastT;
+function toast(msg){var t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on');},2200);}
+function fallbackCopy(text){
+  var x=document.createElement('textarea'); x.value=text; x.style.position='fixed'; x.style.opacity='0';
+  document.body.appendChild(x); x.select(); var ok=false; try{ok=document.execCommand('copy');}catch(e){} document.body.removeChild(x); return ok;
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-copy]'); if(!b) return;
+  var item=copyStore[+b.getAttribute('data-copy')]; if(!item) return;
+  var done=function(ok){toast(ok?'Copied '+item.what:'Copy was blocked by the browser. Select the rows and press Ctrl+C.');};
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(item.text).then(function(){done(true);},function(){done(fallbackCopy(item.text));});
+  } else done(fallbackCopy(item.text));
+});
+
+var TABS=['Tech','Dur','Day'];
+function setTab(name){
+  TABS.forEach(function(k){
+    $('tab'+k).setAttribute('aria-selected',String(k===name)); $('pane'+k).hidden=(k!==name);
+  });
+  save('pmw.tab',name);
+}
+TABS.forEach(function(k){$('tab'+k).onclick=function(){setTab(k);};});
+$('paneTech').addEventListener('click',function(e){
+  var b=e.target.closest('[data-tech]'); if(!b) return;
+  selTech=JSON.parse($('paneTech').dataset.techs)[+b.getAttribute('data-tech')]; render();
+});
+ta.addEventListener('input',function(){save('pmw.src',ta.value);render();});
+fmt.addEventListener('change',function(){save('pmw.fmt',fmt.value);render();});
+week.addEventListener('change',function(){
+  var d=getMonday();
+  if(d&&d.getDay()!==1){week.value=iso(mondayOf(d)); toast('Moved to the Monday of that week');}
+  render();
+});
+$('btnSample').onclick=function(){ta.value=SAMPLE;save('pmw.src',ta.value);render();};
+$('btnClear').onclick=function(){ta.value='';save('pmw.src','');render();ta.focus();};
+
+(function init(){
+  var s=store(true,'pmw.src'); ta.value=(s===null)?SAMPLE:s;
+  var f=store(true,'pmw.fmt'); if(f) fmt.value=f; if(!fmt.value) fmt.selectedIndex=0;
+  var t=new Date(), m=mondayOf(t); if(t.getDay()!==1) m=addDays(m,7);   // upcoming Monday
+  week.value=iso(m);
+  var st=store(true,'pmw.tab'); if(TABS.indexOf(st)>=0) setTab(st);
+  render();
+})();
+</script>
+</body>
+</html>
