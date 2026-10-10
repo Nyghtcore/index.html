@@ -231,6 +231,8 @@ function build(entries){
     it.others=it.entries.filter(function(e){return e.block.name!==it.tech;}).map(function(e){return e.block.name;});
     it.others=it.others.filter(function(v,i,a){return a.indexOf(v)===i;});
     it.multi=it.entries.length>1;
+    it.techset=uniq(it.entries.map(function(e){return e.block.name;})).sort();
+    it.shared=it.techset.length>1;
   });
   return items;
 }
@@ -290,6 +292,34 @@ function dspan(it){
 }
 function tag(it,showTech){return (showTech?'<small class="t">'+esc(it.tech)+'</small>':'')+(dspan(it)?'<small>'+dspan(it)+'</small>':'');}
 
+function techHours(it,name){
+  var hs=it.entries.filter(function(e){return e.block.name===name&&e.hours!==null;});
+  return hs.length?hs.reduce(function(s,e){return s+e.hours;},0):null;
+}
+// Shared WOs: one card per group of technicians, so each can be assigned to all of them.
+function sharedCards(list){
+  var keys=uniq(list.map(function(it){return it.techset.join(' + ');}));
+  if(!keys.length) return '';
+  return keys.map(function(k){
+    var g=list.filter(function(it){return it.techset.join(' + ')===k;}), names=g[0].techset;
+    var table=g.map(function(it){return [it.wo].concat(names).join('\t');}).join('\r\n');
+    return '<article class="card"><header><h2>'+esc(k)+'</h2><span class="badge">'+g.length+' shared WO</span></header>'+
+      '<ul class="wolist">'+g.map(function(it){
+        return '<li>'+esc(it.wo)+'<small>'+names.map(function(n){var h=techHours(it,n);return esc(n)+(h!==null?' '+fh(h)+'h':'');}).join(' · ')+(it.start!==null?' · '+dspan(it):'')+'</small></li>';}).join('')+'</ul>'+
+      '<footer>'+copyBtn(g.map(function(it){return it.wo;}).join('\r\n'),'Copy shared WOs',g.length+' shared WOs ('+k+')','pri')+
+      ' '+copyBtn(table,'Copy WO + technicians','table of '+g.length+' shared WOs')+'</footer></article>';
+  }).join('');
+}
+function workCenterCards(techs,allItems){
+  var shared=allItems.filter(function(it){return it.shared;});
+  return techs.map(function(x){
+    var own=x.items.filter(function(it){return !it.shared;});
+    var h=x.items.reduce(function(s,r){return s+(r.hours||0);},0);
+    var nsh=shared.filter(function(it){return it.techset.indexOf(x.name)>=0;}).length;
+    return '<article class="card"><header><h2>'+esc(x.name)+'</h2><span class="badge">'+own.length+' WO</span>'+(nsh?'<span class="badge h">+'+nsh+' shared</span>':'')+'</header>'+
+      '<footer>'+(own.length?copyBtn(own.map(function(it){return it.wo;}).join('\r\n'),'Copy WOs',own.length+' WOs for '+x.name,'pri'):'<button type="button" disabled>No solo WOs</button>')+'</footer></article>';
+  }).join('')+sharedCards(shared);
+}
 function durCards(items,showTech){
   var keys=uniq(items.filter(function(r){return r.hours!==null;}).map(function(r){return r.hours;})).sort(function(a,b){return b-a;});
   if(items.some(function(r){return r.hours===null;})) keys.push(null);
@@ -369,17 +399,13 @@ function render(){
     '<div class="chips">'+techs.map(function(x,i){
       return '<button type="button" data-tech="'+i+'" aria-pressed="'+(x.name===selTech)+'">'+esc(x.name)+' <span class="badge">'+x.items.length+'</span></button>';}).join('')+'</div>'+
     '<div class="step">1 · Work center — all of '+esc(t.name)+'\'s orders</div>'+
-    '<div class="cards"><article class="card"><header><h2>'+esc(t.name)+'</h2><span class="badge">'+t.items.length+' WO</span><span class="badge h">'+fh(hrs)+' h</span></header>'+
-    '<footer>'+copyBtn(t.items.map(function(it){return it.wo;}).join('\r\n'),'Copy all WOs',t.items.length+' WOs for '+t.name,'pri')+'</footer></article></div>'+
+    '<div class="cards">'+workCenterCards([t],items.filter(function(it){return it.techset.indexOf(t.name)>=0;}))+'</div>'+
     '<div class="step">2 · Duration</div>'+durCards(t.items,false)+
     '<div class="step">3 · Day &amp; date</div>'+dayBlocks(t.items,mon,false);
   $('paneTech').dataset.techs=JSON.stringify(techs.map(function(x){return x.name;}));
   $('paneFast').innerHTML=
-    '<div class="step">1 · Work center — one pass per technician</div>'+
-    '<div class="cards">'+techs.map(function(x){
-      var h=x.items.reduce(function(s,r){return s+(r.hours||0);},0);
-      return '<article class="card"><header><h2>'+esc(x.name)+'</h2><span class="badge">'+x.items.length+' WO</span><span class="badge h">'+fh(h)+' h</span></header>'+
-        '<footer>'+copyBtn(x.items.map(function(it){return it.wo;}).join('\r\n'),'Copy WOs',x.items.length+' WOs for '+x.name,'pri')+'</footer></article>';}).join('')+'</div>'+
+    '<div class="step">1 · Work center — one pass per technician, then the shared WOs</div>'+
+    '<div class="cards">'+workCenterCards(techs,items)+'</div>'+
     '<div class="step">2 · Duration — everyone together</div>'+durCards(items,false)+
     '<div class="step">3 · Day &amp; date — everyone together</div>'+dayBlocks(items,mon,false);
   $('paneDur').innerHTML=durCards(items,true);
